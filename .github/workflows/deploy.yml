@@ -1,0 +1,71 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Backend lint
+        working-directory: backend
+        run: go vet ./...
+
+      - name: Backend test
+        working-directory: backend
+        run: go test ./...
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Frontend install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend build
+        working-directory: frontend
+        run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker images
+        run: |
+          docker build -t briefcast-app ./backend
+          docker build -t briefcast-frontend ./frontend
+          docker save briefcast-app briefcast-frontend | gzip > images.tar.gz
+
+      - name: Deploy to VPS
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          
+          scp images.tar.gz "$VPS_USER@$VPS_HOST:/tmp/"
+          scp docker-compose.yml Caddyfile "$VPS_USER@$VPS_HOST:/opt/briefcast/"
+          
+          ssh "$VPS_USER@$VPS_HOST" << 'EOF'
+            cd /opt/briefcast
+            gunzip -c /tmp/images.tar.gz | docker load
+            docker compose up -d --no-deps frontend server worker
+            sleep 5
+            curl -sf http://localhost:8080/api/health || echo "Health check failed"
+            rm /tmp/images.tar.gz
+          EOF
