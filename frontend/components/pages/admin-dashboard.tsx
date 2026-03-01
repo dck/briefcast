@@ -1,4 +1,3 @@
-import { useState } from "react"
 import {
   ListMusic,
   Users,
@@ -85,14 +84,9 @@ function MiniBar({ values, max }: { values: number[]; max: number }) {
 }
 
 export function AdminDashboard() {
-  const [activeSection, setActiveSection] = useState("overview")
-
   return (
     <div className="flex min-h-screen bg-background">
-      <AdminSidebar
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-      />
+      <AdminSidebar />
 
       <main className="ml-60 flex-1 px-8 py-8">
         <h1 className="mb-6 text-xl font-semibold tracking-tight text-foreground">

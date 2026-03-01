@@ -6,23 +6,20 @@ import {
   Settings,
   LogOut,
 } from "lucide-react"
+import { Link, useLocation } from "react-router-dom"
 import { BriefcastLogo } from "@/components/briefcast-logo"
 
 const adminNavItems = [
-  { label: "Overview", icon: LayoutDashboard, id: "overview" },
-  { label: "Episodes", icon: ListMusic, id: "episodes" },
-  { label: "Users", icon: Users, id: "users" },
-  { label: "Sessions", icon: Activity, id: "sessions" },
-  { label: "Settings", icon: Settings, id: "settings" },
+  { label: "Overview", icon: LayoutDashboard, href: "/admin" },
+  { label: "Episodes", icon: ListMusic, href: "/admin/episodes" },
+  { label: "Users", icon: Users, href: "/admin/users" },
+  { label: "Sessions", icon: Activity, href: "/admin/sessions" },
+  { label: "Settings", icon: Settings, href: "/admin/settings" },
 ]
 
-export function AdminSidebar({
-  activeSection,
-  onSectionChange,
-}: {
-  activeSection: string
-  onSectionChange: (id: string) => void
-}) {
+export function AdminSidebar() {
+  const location = useLocation()
+
   return (
     <aside className="fixed left-0 top-0 z-30 flex h-screen w-60 flex-col border-r border-border bg-sidebar">
       {/* Logo */}
@@ -39,12 +36,11 @@ export function AdminSidebar({
           Admin
         </span>
         {adminNavItems.map((item) => {
-          const isActive = activeSection === item.id
+          const isActive = location.pathname === item.href
           return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSectionChange(item.id)}
+            <Link
+              key={item.href}
+              to={item.href}
               className={`flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${
                 isActive
                   ? "bg-accent text-accent-foreground"
@@ -53,7 +49,7 @@ export function AdminSidebar({
             >
               <item.icon className="h-4 w-4" />
               {item.label}
-            </button>
+            </Link>
           )
         })}
       </nav>

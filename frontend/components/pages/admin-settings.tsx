@@ -17,15 +17,11 @@ const settingsNav = [
 ]
 
 export function AdminSettings() {
-  const [activeSection, setActiveSection] = useState("settings")
   const [activeSettingsTab, setActiveSettingsTab] = useState("processing")
 
   return (
     <div className="flex min-h-screen bg-background">
-      <AdminSidebar
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-      />
+      <AdminSidebar />
 
       <main className="ml-60 flex-1 px-8 py-8">
         <h1 className="mb-6 text-xl font-semibold tracking-tight text-foreground">

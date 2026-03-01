@@ -1,14 +1,17 @@
 import {
   Rss,
+  Bookmark,
   Settings,
   Shield,
   LogOut,
   Plus,
 } from "lucide-react"
+import { Link, useLocation } from "react-router-dom"
 import { BriefcastLogo } from "@/components/briefcast-logo"
 
 const navItems = [
-  { label: "Feed", icon: Rss, href: "/" },
+  { label: "Feed", icon: Rss, href: "/feed" },
+  { label: "Saved", icon: Bookmark, href: "/saved" },
   { label: "Settings", icon: Settings, href: "/settings" },
   { label: "Admin", icon: Shield, href: "/admin" },
 ]
@@ -48,6 +51,8 @@ export function AppSidebar({
   selectedPodcast: string | null
   onSelectPodcast: (id: string | null) => void
 }) {
+  const location = useLocation()
+
   return (
     <aside className="fixed left-0 top-0 z-30 flex h-screen w-60 flex-col border-r border-border bg-sidebar">
       {/* Logo */}
@@ -60,16 +65,23 @@ export function AppSidebar({
 
       {/* Navigation */}
       <nav className="flex flex-col gap-0.5 px-3">
-        {navItems.map((item) => (
-          <a
-            key={item.label}
-            href={item.href}
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          >
-            <item.icon className="h-4 w-4" />
-            {item.label}
-          </a>
-        ))}
+        {navItems.map((item) => {
+          const isActive = location.pathname === item.href
+          return (
+            <Link
+              key={item.label}
+              to={item.href}
+              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                isActive
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              }`}
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </Link>
+          )
+        })}
       </nav>
 
       {/* Podcasts section */}
