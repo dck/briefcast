@@ -1,6 +1,9 @@
+import { useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import { Mic, FileText, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BriefcastLogo } from "@/components/briefcast-logo"
+import { useAuth } from "@/src/auth"
 
 const features = [
   {
@@ -51,6 +54,13 @@ function YandexIcon() {
 }
 
 export function LandingPage() {
+  const { user, loading } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!loading && user) navigate("/feed", { replace: true })
+  }, [user, loading, navigate])
+
   return (
     <div className="min-h-screen bg-background">
       {/* Top navbar */}
@@ -61,8 +71,8 @@ export function LandingPage() {
             Briefcast
           </span>
         </div>
-        <Button variant="outline" size="sm">
-          Sign in
+        <Button variant="outline" size="sm" asChild>
+          <a href="/api/auth/google">Sign in</a>
         </Button>
       </header>
 
@@ -76,17 +86,23 @@ export function LandingPage() {
           deep structured summaries the moment a new episode drops.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button variant="outline" size="lg" className="gap-2.5">
-            <GoogleIcon />
-            Sign in with Google
+          <Button variant="outline" size="lg" className="gap-2.5" asChild>
+            <a href="/api/auth/google">
+              <GoogleIcon />
+              Sign in with Google
+            </a>
           </Button>
-          <Button variant="outline" size="lg" className="gap-2.5">
-            <GitHubIcon />
-            Sign in with GitHub
+          <Button variant="outline" size="lg" className="gap-2.5" asChild>
+            <a href="/api/auth/github">
+              <GitHubIcon />
+              Sign in with GitHub
+            </a>
           </Button>
-          <Button variant="outline" size="lg" className="gap-2.5">
-            <YandexIcon />
-            Sign in with Yandex
+          <Button variant="outline" size="lg" className="gap-2.5" asChild>
+            <a href="/api/auth/yandex">
+              <YandexIcon />
+              Sign in with Yandex
+            </a>
           </Button>
         </div>
       </section>

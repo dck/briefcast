@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 import { BriefcastLogo } from "@/components/briefcast-logo"
+import { useAuth } from "@/src/auth"
 
 const adminNavItems = [
   { label: "Overview", icon: LayoutDashboard, href: "/admin" },
@@ -58,29 +59,38 @@ export function AdminSidebar() {
       <div className="flex-1" />
 
       {/* User profile */}
-      <div className="border-t border-border px-3 py-4">
-        <div className="flex items-center gap-3 px-3">
-          <img
-            src="https://picsum.photos/seed/admin/32/32"
-            alt="Admin avatar"
-            width={32}
-            height={32}
-            className="h-8 w-8 rounded-full object-cover"
-          />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm font-medium text-sidebar-foreground">
-              Admin
-            </span>
-            <a
-              href="/logout"
-              className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-destructive"
-            >
-              <LogOut className="h-3 w-3" />
-              Logout
-            </a>
-          </div>
+      <AdminUserProfile />
+    </aside>
+  )
+}
+
+function AdminUserProfile() {
+  const { user, logout } = useAuth()
+
+  return (
+    <div className="border-t border-border px-3 py-4">
+      <div className="flex items-center gap-3 px-3">
+        <img
+          src={user?.avatarUrl || "https://picsum.photos/seed/admin/32/32"}
+          alt="Admin avatar"
+          width={32}
+          height={32}
+          className="h-8 w-8 rounded-full object-cover"
+        />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-medium text-sidebar-foreground">
+            {user?.name || "Admin"}
+          </span>
+          <button
+            type="button"
+            onClick={logout}
+            className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-destructive"
+          >
+            <LogOut className="h-3 w-3" />
+            Logout
+          </button>
         </div>
       </div>
-    </aside>
+    </div>
   )
 }
