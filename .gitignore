@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+dist/
+frontend/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.local
+
+# Data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Audio temp
+audio/
+
+# Go
+/backend/server
+/backend/worker
+
+# Logs
+*.log
+prd.md
