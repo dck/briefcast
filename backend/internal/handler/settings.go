@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/briefcast/briefcast/internal/middleware"
+	"github.com/dck/briefcast/internal/middleware"
+	"github.com/dck/briefcast/internal/repository"
 )
 
 type UserSettings struct {
@@ -42,6 +43,8 @@ func GetSettings() http.HandlerFunc {
 // UpdateSettings handles PUT /api/settings
 // Updates email, telegram_chat_id, notify_telegram, notify_email for the current user.
 func UpdateSettings(db *sql.DB) http.HandlerFunc {
+	repo := repository.NewSettingsRepository(db)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := middleware.GetUser(r)
 		if u == nil {
@@ -59,11 +62,14 @@ func UpdateSettings(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_, err := db.ExecContext(r.Context(),
-			`UPDATE users SET email = ?, telegram_chat_id = ?, notify_telegram = ?, notify_email = ? WHERE id = ?`,
-			settings.Email, settings.TelegramChatID, settings.NotifyTelegram, settings.NotifyEmail, u.ID,
-		)
-		if err != nil {
+		if err := repo.UpdateUserSettings(
+			r.Context(),
+			u.ID,
+			settings.Email,
+			settings.TelegramChatID,
+			settings.NotifyTelegram,
+			settings.NotifyEmail,
+		); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "failed to update settings"})

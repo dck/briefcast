@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"database/sql"
 	"embed"
+	"errors"
 	"html/template"
 	"net/http"
 	"strings"
 
+	"github.com/dck/briefcast/internal/repository"
 	"github.com/go-chi/chi/v5"
 	"github.com/yuin/goldmark"
 )
@@ -27,29 +29,16 @@ type SharePageData struct {
 // renders Markdown summary to HTML via goldmark, renders the template.
 // No authentication required.
 func SharePage(db *sql.DB, tmplFS embed.FS) http.HandlerFunc {
+	repo := repository.NewShareRepository(db)
+
 	// Parse template from embed.FS at startup
-	tmpl := template.Must(template.ParseFS(tmplFS, "templates/share.html"))
+	tmpl := template.Must(template.ParseFS(tmplFS, "share.html"))
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := chi.URLParam(r, "token")
 
-		// Query share_link → episode → podcast
-		var data SharePageData
-		var summary sql.NullString
-		var audioURL, imageURL, publishedAt sql.NullString
-
-		err := db.QueryRow(`
-			SELECT e.title, p.title, p.image_url, e.summary, e.audio_url, e.published_at
-			FROM share_links sl
-			JOIN episodes e ON sl.episode_id = e.id
-			JOIN podcasts p ON e.podcast_id = p.id
-			WHERE sl.token = ? AND e.status = 'done'
-		`, token).Scan(
-			&data.EpisodeTitle, &data.PodcastTitle,
-			&imageURL, &summary, &audioURL, &publishedAt,
-		)
-
-		if err == sql.ErrNoRows {
+		shared, err := repo.GetSharedEpisode(r.Context(), token)
+		if errors.Is(err, repository.ErrNotFound) {
 			http.NotFound(w, r)
 			return
 		}
@@ -58,19 +47,23 @@ func SharePage(db *sql.DB, tmplFS embed.FS) http.HandlerFunc {
 			return
 		}
 
-		data.PodcastImageURL = imageURL.String
-		data.AudioURL = audioURL.String
-		data.PublishedAt = publishedAt.String
+		data := SharePageData{
+			EpisodeTitle:    shared.EpisodeTitle,
+			PodcastTitle:    shared.PodcastTitle,
+			PodcastImageURL: shared.PodcastImageURL,
+			PublishedAt:     shared.PublishedAt,
+			AudioURL:        shared.AudioURL,
+		}
 
 		// Convert Markdown to HTML via goldmark
-		if summary.Valid {
+		if shared.HasSummary {
 			var buf bytes.Buffer
-			if err := goldmark.Convert([]byte(summary.String), &buf); err == nil {
+			if err := goldmark.Convert([]byte(shared.Summary), &buf); err == nil {
 				data.SummaryHTML = template.HTML(buf.String())
 			}
 
 			// Extract teaser: first ~200 chars of the plain summary text
-			teaser := summary.String
+			teaser := shared.Summary
 			if idx := strings.Index(teaser, "\n\n"); idx > 0 && idx < 300 {
 				teaser = teaser[:idx]
 			}

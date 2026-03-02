@@ -8,9 +8,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/briefcast/briefcast/internal/config"
-	"github.com/briefcast/briefcast/internal/middleware"
-	"github.com/briefcast/briefcast/internal/oauth"
+	"github.com/dck/briefcast/internal/config"
+	"github.com/dck/briefcast/internal/middleware"
+	"github.com/dck/briefcast/internal/oauth"
+	"github.com/dck/briefcast/internal/repository"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -51,6 +52,8 @@ func AuthRedirect(cfg *config.Config, providers map[string]*oauth.Provider) http
 }
 
 func AuthCallback(cfg *config.Config, db *sql.DB, providers map[string]*oauth.Provider) http.HandlerFunc {
+	repo := repository.NewAuthRepository(db)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		stateCookie, err := r.Cookie("oauth_state")
 		if err != nil {
@@ -86,19 +89,14 @@ func AuthCallback(cfg *config.Config, db *sql.DB, providers map[string]*oauth.Pr
 			return
 		}
 
-		var userID int
-		var isActive bool
-		err = db.QueryRowContext(r.Context(), `
-			INSERT INTO users (oauth_provider, oauth_id, email, name, avatar_url, last_seen_at)
-			VALUES (?, ?, ?, ?, ?, datetime('now'))
-			ON CONFLICT(oauth_provider, oauth_id) DO UPDATE SET
-				email = excluded.email,
-				name = excluded.name,
-				avatar_url = excluded.avatar_url,
-				last_seen_at = datetime('now')
-			RETURNING id, is_active`,
-			providerCookie.Value, userInfo.ID, userInfo.Email, userInfo.Name, userInfo.AvatarURL,
-		).Scan(&userID, &isActive)
+		userID, isActive, err := repo.UpsertOAuthUser(
+			r.Context(),
+			providerCookie.Value,
+			userInfo.ID,
+			userInfo.Email,
+			userInfo.Name,
+			userInfo.AvatarURL,
+		)
 		if err != nil {
 			http.Error(w, "database error", http.StatusInternalServerError)
 			return
@@ -109,7 +107,7 @@ func AuthCallback(cfg *config.Config, db *sql.DB, providers map[string]*oauth.Pr
 			return
 		}
 
-		cookieValue, expiresAt, err := middleware.CreateSession(db, userID, cfg.SessionSecret)
+		cookieValue, expiresAt, err := middleware.CreateSession(r.Context(), db, userID, cfg.SessionSecret)
 		if err != nil {
 			http.Error(w, "failed to create session", http.StatusInternalServerError)
 			return
@@ -143,6 +141,8 @@ func AuthCallback(cfg *config.Config, db *sql.DB, providers map[string]*oauth.Pr
 }
 
 func Logout(db *sql.DB) http.HandlerFunc {
+	repo := repository.NewAuthRepository(db)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session")
 		if err == nil {
@@ -150,7 +150,7 @@ func Logout(db *sql.DB) http.HandlerFunc {
 			if i := strings.Index(token, ":"); i != -1 {
 				token = token[:i]
 			}
-			db.Exec("DELETE FROM sessions WHERE token = ?", token)
+			_ = repo.DeleteSessionToken(r.Context(), token)
 		}
 
 		http.SetCookie(w, &http.Cookie{
@@ -207,4 +207,3 @@ func Me() http.HandlerFunc {
 		json.NewEncoder(w).Encode(resp)
 	}
 }
-

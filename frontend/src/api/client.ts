@@ -7,7 +7,6 @@ export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> 
     ...opts,
   })
   if (res.status === 401) {
-    window.location.href = "/"
     throw new Error("Unauthorized")
   }
   if (!res.ok) {

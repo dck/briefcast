@@ -4,11 +4,13 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"math/big"
 	"net/http"
 	"strconv"
 
-	"github.com/briefcast/briefcast/internal/middleware"
+	"github.com/dck/briefcast/internal/middleware"
+	"github.com/dck/briefcast/internal/repository"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -57,6 +59,8 @@ func base58Encode(data []byte) string {
 
 // GetEpisode handles GET /api/episodes/{id}
 func GetEpisode(db *sql.DB) http.HandlerFunc {
+	repo := repository.NewEpisodeRepository(db)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := middleware.GetUser(r)
 		if u == nil {
@@ -72,28 +76,8 @@ func GetEpisode(db *sql.DB) http.HandlerFunc {
 
 		userID := u.ID
 
-		var ep EpisodeDetail
-		var description, audioURL, summary, publishedAt, processedAt, podcastImageURL sql.NullString
-
-		err = db.QueryRowContext(r.Context(), `
-			SELECT e.id, e.podcast_id, p.title, p.image_url,
-				e.title, e.description, e.audio_url, e.summary, e.status,
-				e.published_at, e.processed_at,
-				CASE WHEN er.user_id IS NOT NULL THEN 1 ELSE 0 END,
-				CASE WHEN b.user_id IS NOT NULL THEN 1 ELSE 0 END
-			FROM episodes e
-			JOIN podcasts p ON p.id = e.podcast_id
-			LEFT JOIN episode_reads er ON er.episode_id = e.id AND er.user_id = ?
-			LEFT JOIN bookmarks b ON b.episode_id = e.id AND b.user_id = ?
-			WHERE e.id = ?`,
-			userID, userID, episodeID,
-		).Scan(
-			&ep.ID, &ep.PodcastID, &ep.PodcastTitle, &podcastImageURL,
-			&ep.Title, &description, &audioURL, &summary, &ep.Status,
-			&publishedAt, &processedAt,
-			&ep.IsRead, &ep.IsBookmarked,
-		)
-		if err == sql.ErrNoRows {
+		episode, err := repo.GetEpisodeDetail(r.Context(), userID, episodeID)
+		if errors.Is(err, repository.ErrNotFound) {
 			writeJSONError(w, "episode not found", http.StatusNotFound)
 			return
 		}
@@ -102,26 +86,29 @@ func GetEpisode(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if !u.IsAdmin && ep.Status != "done" {
+		if !u.IsAdmin && episode.Status != "done" {
 			writeJSONError(w, "episode not found", http.StatusNotFound)
 			return
 		}
 
-		ep.PodcastImageURL = podcastImageURL.String
-		ep.Description = description.String
-		ep.AudioURL = audioURL.String
-		ep.Summary = summary.String
-		ep.PublishedAt = publishedAt.String
-		ep.ProcessedAt = processedAt.String
-
 		// Mark as read
-		_, _ = db.ExecContext(r.Context(), `
-			INSERT INTO episode_reads (user_id, episode_id, read_at)
-			VALUES (?, ?, datetime('now'))
-			ON CONFLICT(user_id, episode_id) DO UPDATE SET read_at = datetime('now')`,
-			userID, episodeID,
-		)
-		ep.IsRead = true
+		_ = repo.MarkRead(r.Context(), userID, episodeID)
+
+		ep := EpisodeDetail{
+			ID:              episode.ID,
+			PodcastID:       episode.PodcastID,
+			PodcastTitle:    episode.PodcastTitle,
+			PodcastImageURL: episode.PodcastImageURL,
+			Title:           episode.Title,
+			Description:     episode.Description,
+			AudioURL:        episode.AudioURL,
+			Summary:         episode.Summary,
+			Status:          episode.Status,
+			PublishedAt:     episode.PublishedAt,
+			ProcessedAt:     episode.ProcessedAt,
+			IsRead:          true,
+			IsBookmarked:    episode.IsBookmarked,
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(ep)
@@ -130,6 +117,8 @@ func GetEpisode(db *sql.DB) http.HandlerFunc {
 
 // MarkRead handles POST /api/episodes/{id}/read
 func MarkRead(db *sql.DB) http.HandlerFunc {
+	repo := repository.NewEpisodeRepository(db)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := middleware.GetUser(r)
 		if u == nil {
@@ -145,13 +134,7 @@ func MarkRead(db *sql.DB) http.HandlerFunc {
 
 		userID := u.ID
 
-		_, err = db.ExecContext(r.Context(), `
-			INSERT INTO episode_reads (user_id, episode_id, read_at)
-			VALUES (?, ?, datetime('now'))
-			ON CONFLICT(user_id, episode_id) DO UPDATE SET read_at = datetime('now')`,
-			userID, episodeID,
-		)
-		if err != nil {
+		if err := repo.MarkRead(r.Context(), userID, episodeID); err != nil {
 			writeJSONError(w, "database error", http.StatusInternalServerError)
 			return
 		}
@@ -162,6 +145,8 @@ func MarkRead(db *sql.DB) http.HandlerFunc {
 
 // ToggleBookmark handles POST /api/episodes/{id}/bookmark
 func ToggleBookmark(db *sql.DB) http.HandlerFunc {
+	repo := repository.NewEpisodeRepository(db)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := middleware.GetUser(r)
 		if u == nil {
@@ -177,39 +162,21 @@ func ToggleBookmark(db *sql.DB) http.HandlerFunc {
 
 		userID := u.ID
 
-		var exists bool
-		err = db.QueryRowContext(r.Context(),
-			`SELECT EXISTS(SELECT 1 FROM bookmarks WHERE user_id = ? AND episode_id = ?)`,
-			userID, episodeID,
-		).Scan(&exists)
-		if err != nil {
-			writeJSONError(w, "database error", http.StatusInternalServerError)
-			return
-		}
-
-		if exists {
-			_, err = db.ExecContext(r.Context(),
-				`DELETE FROM bookmarks WHERE user_id = ? AND episode_id = ?`,
-				userID, episodeID,
-			)
-		} else {
-			_, err = db.ExecContext(r.Context(),
-				`INSERT INTO bookmarks (user_id, episode_id, created_at) VALUES (?, ?, datetime('now'))`,
-				userID, episodeID,
-			)
-		}
+		bookmarked, err := repo.ToggleBookmark(r.Context(), userID, episodeID)
 		if err != nil {
 			writeJSONError(w, "database error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]bool{"bookmarked": !exists})
+		json.NewEncoder(w).Encode(map[string]bool{"bookmarked": bookmarked})
 	}
 }
 
 // ShareEpisode handles POST /api/episodes/{id}/share
 func ShareEpisode(db *sql.DB) http.HandlerFunc {
+	repo := repository.NewShareRepository(db)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := middleware.GetUser(r)
 		if u == nil {
@@ -226,13 +193,8 @@ func ShareEpisode(db *sql.DB) http.HandlerFunc {
 		userID := u.ID
 
 		// Check for existing share link
-		var token string
-		err = db.QueryRowContext(r.Context(),
-			`SELECT token FROM share_links WHERE episode_id = ?`,
-			episodeID,
-		).Scan(&token)
-
-		if err == sql.ErrNoRows {
+		token, err := repo.GetTokenByEpisodeID(r.Context(), episodeID)
+		if errors.Is(err, repository.ErrNotFound) {
 			// Generate new token
 			b := make([]byte, 16)
 			if _, err := rand.Read(b); err != nil {
@@ -241,12 +203,7 @@ func ShareEpisode(db *sql.DB) http.HandlerFunc {
 			}
 			token = base58Encode(b)
 
-			_, err = db.ExecContext(r.Context(), `
-				INSERT INTO share_links (token, episode_id, created_by, created_at)
-				VALUES (?, ?, ?, datetime('now'))`,
-				token, episodeID, userID,
-			)
-			if err != nil {
+			if err := repo.CreateShareLink(r.Context(), token, episodeID, userID); err != nil {
 				writeJSONError(w, "database error", http.StatusInternalServerError)
 				return
 			}

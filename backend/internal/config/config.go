@@ -29,7 +29,7 @@ func Load() (*Config, error) {
 	_ = godotenv.Load() // ignore error — env vars may be set directly
 
 	return &Config{
-		ServerPort:          getEnv("SERVER_PORT", "8080"),
+		ServerPort:          getEnv("BACKEND_PORT", "8080"),
 		BaseURL:             getEnv("BASE_URL", "http://localhost:5173"),
 		DatabasePath:        getEnv("DATABASE_PATH", "./data/briefcast.db"),
 		AudioTmpDir:         getEnv("AUDIO_TMP_DIR", "./data/audio"),

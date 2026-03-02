@@ -4,11 +4,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/briefcast/briefcast/internal/middleware"
+	"github.com/dck/briefcast/internal/middleware"
+	"github.com/dck/briefcast/internal/repository"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -52,6 +54,8 @@ func podcastError(w http.ResponseWriter, status int, msg string) {
 // ListPodcasts handles GET /api/podcasts.
 // Returns the user's subscriptions with episode counts (only status='done' episodes counted).
 func ListPodcasts(db *sql.DB) http.HandlerFunc {
+	repo := repository.NewPodcastRepository(db)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := middleware.GetUser(r)
 		if u == nil {
@@ -59,37 +63,26 @@ func ListPodcasts(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		rows, err := db.QueryContext(r.Context(), `
-			SELECT p.id, p.title, p.description, COALESCE(p.image_url, ''), p.rss_url,
-			       COUNT(e.id) AS episode_count, s.active
-			FROM subscriptions s
-			JOIN podcasts p ON p.id = s.podcast_id
-			LEFT JOIN episodes e ON e.podcast_id = p.id AND e.status = 'done'
-			WHERE s.user_id = $1
-			GROUP BY p.id, p.title, p.description, p.image_url, p.rss_url, s.active
-			ORDER BY p.title`, u.ID)
+		podcasts, err := repo.ListByUser(r.Context(), u.ID)
 		if err != nil {
 			podcastError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
-		defer rows.Close()
 
-		items := []PodcastItem{}
-		for rows.Next() {
-			var item PodcastItem
-			var active bool
-			if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.ImageURL, &item.RSSURL, &item.EpisodeCount, &active); err != nil {
-				podcastError(w, http.StatusInternalServerError, "internal error")
-				return
+		items := make([]PodcastItem, 0, len(podcasts))
+		for _, p := range podcasts {
+			item := PodcastItem{
+				ID:           p.ID,
+				Title:        p.Title,
+				Description:  p.Description,
+				ImageURL:     p.ImageURL,
+				RSSURL:       p.RSSURL,
+				EpisodeCount: p.EpisodeCount,
 			}
-			if !active {
+			if !p.Active {
 				item.Title = item.Title + " (inactive)"
 			}
 			items = append(items, item)
-		}
-		if err := rows.Err(); err != nil {
-			podcastError(w, http.StatusInternalServerError, "internal error")
-			return
 		}
 
 		podcastJSON(w, http.StatusOK, items)
@@ -99,6 +92,8 @@ func ListPodcasts(db *sql.DB) http.HandlerFunc {
 // AddPodcast handles POST /api/podcasts.
 // Accepts {"rssUrl": "https://..."}, fetches the feed, and creates or reuses the podcast and subscription.
 func AddPodcast(db *sql.DB) http.HandlerFunc {
+	repo := repository.NewPodcastRepository(db)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := middleware.GetUser(r)
 		if u == nil {
@@ -155,13 +150,9 @@ func AddPodcast(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Upsert podcast: reuse existing row if rss_url matches.
-		var podcastID int
-		err = db.QueryRowContext(r.Context(),
-			`SELECT id FROM podcasts WHERE rss_url = $1`, rssURL).Scan(&podcastID)
-		if err == sql.ErrNoRows {
-			err = db.QueryRowContext(r.Context(),
-				`INSERT INTO podcasts (rss_url, title, description, image_url) VALUES ($1, $2, $3, $4) RETURNING id`,
-				rssURL, title, description, imageURL).Scan(&podcastID)
+		podcastID, err := repo.GetPodcastIDByRSSURL(r.Context(), rssURL)
+		if errors.Is(err, repository.ErrNotFound) {
+			podcastID, err = repo.CreatePodcast(r.Context(), rssURL, title, description, imageURL)
 			if err != nil {
 				podcastError(w, http.StatusInternalServerError, "internal error")
 				return
@@ -172,15 +163,9 @@ func AddPodcast(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Upsert subscription: reactivate if inactive.
-		var existingActive bool
-		err = db.QueryRowContext(r.Context(),
-			`SELECT active FROM subscriptions WHERE user_id = $1 AND podcast_id = $2`,
-			u.ID, podcastID).Scan(&existingActive)
-		if err == sql.ErrNoRows {
-			_, err = db.ExecContext(r.Context(),
-				`INSERT INTO subscriptions (user_id, podcast_id, active) VALUES ($1, $2, true)`,
-				u.ID, podcastID)
-			if err != nil {
+		existingActive, err := repo.GetSubscriptionActive(r.Context(), u.ID, podcastID)
+		if errors.Is(err, repository.ErrNotFound) {
+			if err := repo.CreateSubscription(r.Context(), u.ID, podcastID); err != nil {
 				podcastError(w, http.StatusInternalServerError, "internal error")
 				return
 			}
@@ -188,10 +173,7 @@ func AddPodcast(db *sql.DB) http.HandlerFunc {
 			podcastError(w, http.StatusInternalServerError, "internal error")
 			return
 		} else if !existingActive {
-			_, err = db.ExecContext(r.Context(),
-				`UPDATE subscriptions SET active = true WHERE user_id = $1 AND podcast_id = $2`,
-				u.ID, podcastID)
-			if err != nil {
+			if err := repo.ActivateSubscription(r.Context(), u.ID, podcastID); err != nil {
 				podcastError(w, http.StatusInternalServerError, "internal error")
 				return
 			}
@@ -211,6 +193,8 @@ func AddPodcast(db *sql.DB) http.HandlerFunc {
 // RemovePodcast handles DELETE /api/podcasts/{id}.
 // Soft deletes the subscription by setting active=false.
 func RemovePodcast(db *sql.DB) http.HandlerFunc {
+	repo := repository.NewPodcastRepository(db)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := middleware.GetUser(r)
 		if u == nil {
@@ -224,21 +208,11 @@ func RemovePodcast(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		res, err := db.ExecContext(r.Context(),
-			`UPDATE subscriptions SET active = false WHERE user_id = $1 AND podcast_id = $2 AND active = true`,
-			u.ID, podcastID)
-		if err != nil {
-			podcastError(w, http.StatusInternalServerError, "internal error")
-			return
-		}
-
-		n, err := res.RowsAffected()
-		if err != nil {
-			podcastError(w, http.StatusInternalServerError, "internal error")
-			return
-		}
-		if n == 0 {
+		if err := repo.DeactivateSubscription(r.Context(), u.ID, podcastID); errors.Is(err, repository.ErrNotFound) {
 			podcastError(w, http.StatusNotFound, "subscription not found")
+			return
+		} else if err != nil {
+			podcastError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
 

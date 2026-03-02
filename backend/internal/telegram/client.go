@@ -33,8 +33,8 @@ type sendMessageRequest struct {
 
 // sendMessageResponse represents the API response from Telegram.
 type sendMessageResponse struct {
-	OK    bool                   `json:"ok"`
-	Error string                 `json:"description,omitempty"`
+	OK     bool                   `json:"ok"`
+	Error  string                 `json:"description,omitempty"`
 	Result map[string]interface{} `json:"result,omitempty"`
 }
 

@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/briefcast/briefcast/internal/config"
+	"github.com/dck/briefcast/internal/config"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
 	"golang.org/x/oauth2/google"

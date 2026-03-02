@@ -10,14 +10,14 @@ import (
 
 	"github.com/go-co-op/gocron/v2"
 
-	"github.com/briefcast/briefcast/internal/config"
-	"github.com/briefcast/briefcast/internal/db"
-	"github.com/briefcast/briefcast/internal/groq"
-	"github.com/briefcast/briefcast/internal/resend"
-	"github.com/briefcast/briefcast/internal/settings"
-	"github.com/briefcast/briefcast/internal/telegram"
-	"github.com/briefcast/briefcast/internal/worker"
-	"github.com/briefcast/briefcast/migrations"
+	"github.com/dck/briefcast/internal/config"
+	"github.com/dck/briefcast/internal/db"
+	"github.com/dck/briefcast/internal/groq"
+	"github.com/dck/briefcast/internal/resend"
+	"github.com/dck/briefcast/internal/settings"
+	"github.com/dck/briefcast/internal/telegram"
+	"github.com/dck/briefcast/internal/worker"
+	"github.com/dck/briefcast/migrations"
 )
 
 func main() {

@@ -6,6 +6,16 @@ import "strings"
 // with overlap tokens of overlap between consecutive chunks.
 // Token estimation: split by whitespace, ~1 word ≈ 1 token.
 func ChunkTranscript(text string, maxTokens, overlap int) []string {
+	if maxTokens <= 0 {
+		return nil
+	}
+	if overlap >= maxTokens {
+		overlap = maxTokens - 1
+	}
+	if overlap < 0 {
+		overlap = 0
+	}
+
 	words := strings.Fields(text)
 	if len(words) == 0 {
 		return nil

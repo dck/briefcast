@@ -1,11 +1,13 @@
-{$DOMAIN:localhost} {
+{$DOMAIN:http://localhost} {
     handle /api/* {
-        reverse_proxy server:8080
+        reverse_proxy server:{$BACKEND_PORT:8080}
     }
     handle /e/* {
-        reverse_proxy server:8080
+        reverse_proxy server:{$BACKEND_PORT:8080}
     }
     handle {
-        reverse_proxy frontend:80
+        reverse_proxy frontend:80 {
+            header_up Host {upstream_hostport}
+        }
     }
 }

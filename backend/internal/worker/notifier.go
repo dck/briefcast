@@ -6,8 +6,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/briefcast/briefcast/internal/resend"
-	"github.com/briefcast/briefcast/internal/telegram"
+	"github.com/dck/briefcast/internal/resend"
+	"github.com/dck/briefcast/internal/telegram"
 )
 
 type Notifier struct {

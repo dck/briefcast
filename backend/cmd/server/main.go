@@ -7,13 +7,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
-	"github.com/briefcast/briefcast/internal/config"
-	"github.com/briefcast/briefcast/internal/db"
-	"github.com/briefcast/briefcast/internal/handler"
-	"github.com/briefcast/briefcast/internal/middleware"
-	"github.com/briefcast/briefcast/internal/oauth"
-	"github.com/briefcast/briefcast/migrations"
-	"github.com/briefcast/briefcast/templates"
+	"github.com/dck/briefcast/internal/config"
+	"github.com/dck/briefcast/internal/db"
+	"github.com/dck/briefcast/internal/handler"
+	"github.com/dck/briefcast/internal/middleware"
+	"github.com/dck/briefcast/internal/oauth"
+	"github.com/dck/briefcast/migrations"
+	"github.com/dck/briefcast/templates"
 )
 
 func main() {

@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/briefcast/briefcast/internal/groq"
-	"github.com/briefcast/briefcast/internal/settings"
-	"github.com/briefcast/briefcast/internal/telegram"
+	"github.com/dck/briefcast/internal/groq"
+	"github.com/dck/briefcast/internal/settings"
+	"github.com/dck/briefcast/internal/telegram"
 )
 
 const summaryPrompt = `You are an expert podcast summarizer. Create a comprehensive, structured article-style summary of the following podcast episode transcript.
@@ -149,7 +149,7 @@ func (p *Processor) stepDownload(episodeID int, audioURL string) error {
 	if resp.StatusCode != http.StatusOK {
 		msg := fmt.Sprintf("unexpected HTTP status %d", resp.StatusCode)
 		p.logStep(episodeID, "download", "error", msg, time.Since(start).Milliseconds())
-		return fmt.Errorf(msg)
+		return fmt.Errorf("%s", msg)
 	}
 
 	audioPath := filepath.Join(p.AudioTmpDir, fmt.Sprintf("%d.mp3", episodeID))
@@ -389,5 +389,3 @@ func (p *Processor) notifyAdmin(message string) {
 		log.Printf("failed to send admin notification: %v", err)
 	}
 }
-
-

@@ -33,9 +33,9 @@ type rssFeed struct {
 }
 
 type rssChannel struct {
-	Title       string    `xml:"title"`
-	Description string    `xml:"description"`
-	Image       rssImage  `xml:"image"`
+	Title       string   `xml:"title"`
+	Description string   `xml:"description"`
+	Image       rssImage `xml:"image"`
 	ItunesImage struct {
 		Href string `xml:"href,attr"`
 	} `xml:"http://www.itunes.apple.com/dtds/podcast-1.0.dtd image"`
@@ -267,10 +267,10 @@ func parseRSSDate(s string) *time.Time {
 		time.RFC822,                      // 02 Jan 06 15:04 MST
 		"Mon, 2 Jan 2006 15:04:05 -0700", // single-digit day
 		"Mon, 2 Jan 2006 15:04:05 MST",
-		"2006-01-02T15:04:05Z",           // ISO 8601
+		"2006-01-02T15:04:05Z", // ISO 8601
 		"2006-01-02T15:04:05-07:00",
 		"2006-01-02 15:04:05",
-		"02 Jan 2006 15:04:05 -0700",     // without weekday
+		"02 Jan 2006 15:04:05 -0700", // without weekday
 		"02 Jan 2006 15:04:05 MST",
 	}
 

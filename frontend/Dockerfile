@@ -5,9 +5,6 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-FROM joseluisq/static-web-server:2-alpine
-COPY --from=builder /app/dist /public
-ENV SERVER_PORT=80
-ENV SERVER_FALLBACK_PAGE=/public/index.html
-ENV SERVER_LOG_LEVEL=info
+FROM rtsp/lighttpd:latest
+COPY --from=builder /app/dist /var/www/html
 EXPOSE 80

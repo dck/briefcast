@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/dck/briefcast/internal/repository"
 )
 
 type contextKey string
@@ -46,6 +48,8 @@ func GetUser(r *http.Request) *User {
 // Updates sessions.last_seen_at and users.last_seen_at on each request.
 // Returns 401 JSON error if not authenticated.
 func RequireAuth(db *sql.DB, sessionSecret string) func(http.Handler) http.Handler {
+	repo := repository.NewAuthRepository(db)
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie("session")
@@ -67,17 +71,13 @@ func RequireAuth(db *sql.DB, sessionSecret string) func(http.Handler) http.Handl
 				return
 			}
 
-			var userID int
-			var expiresAtStr string
-			err = db.QueryRow(
-				"SELECT user_id, expires_at FROM sessions WHERE token = ?", token,
-			).Scan(&userID, &expiresAtStr)
+			session, err := repo.GetSession(r.Context(), token)
 			if err != nil {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "session not found"})
 				return
 			}
 
-			expiresAt, err := time.Parse("2006-01-02 15:04:05", expiresAtStr)
+			expiresAt, err := time.Parse("2006-01-02 15:04:05", session.ExpiresAt)
 			if err != nil {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid session"})
 				return
@@ -92,12 +92,7 @@ func RequireAuth(db *sql.DB, sessionSecret string) func(http.Handler) http.Handl
 			// Sliding session: extend if within last 24 hours before expiry
 			if expiresAt.Sub(now) < 24*time.Hour {
 				newExpiry := now.Add(30 * 24 * time.Hour)
-				_, _ = db.Exec(
-					"UPDATE sessions SET expires_at = ?, last_seen_at = ? WHERE token = ?",
-					newExpiry.Format("2006-01-02 15:04:05"),
-					now.Format("2006-01-02 15:04:05"),
-					token,
-				)
+				_ = repo.UpdateSessionExpiry(r.Context(), token, newExpiry, now)
 				http.SetCookie(w, &http.Cookie{
 					Name:     "session",
 					Value:    token + ":" + sig,
@@ -107,42 +102,33 @@ func RequireAuth(db *sql.DB, sessionSecret string) func(http.Handler) http.Handl
 					Expires:  newExpiry,
 				})
 			} else {
-				_, _ = db.Exec(
-					"UPDATE sessions SET last_seen_at = ? WHERE token = ?",
-					now.Format("2006-01-02 15:04:05"),
-					token,
-				)
+				_ = repo.UpdateSessionLastSeen(r.Context(), token, now)
 			}
 
 			// Update users.last_seen_at
-			_, _ = db.Exec(
-				"UPDATE users SET last_seen_at = ? WHERE id = ?",
-				now.Format("2006-01-02 15:04:05"),
-				userID,
-			)
+			_ = repo.UpdateUserLastSeen(r.Context(), session.UserID, now)
 
-			var user User
-			var email, name, avatarURL, telegramChatID, lastSeenAt sql.NullString
-			err = db.QueryRow(
-				`SELECT id, oauth_provider, oauth_id, email, name, avatar_url,
-				        telegram_chat_id, notify_telegram, notify_email,
-				        is_admin, is_active, created_at, last_seen_at
-				 FROM users WHERE id = ?`, userID,
-			).Scan(
-				&user.ID, &user.OAuthProvider, &user.OAuthID,
-				&email, &name, &avatarURL,
-				&telegramChatID, &user.NotifyTelegram, &user.NotifyEmail,
-				&user.IsAdmin, &user.IsActive, &user.CreatedAt, &lastSeenAt,
-			)
+			authUser, err := repo.GetUserByID(r.Context(), session.UserID)
 			if err != nil {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "user not found"})
 				return
 			}
-			user.Email = email.String
-			user.Name = name.String
-			user.AvatarURL = avatarURL.String
-			user.TelegramChatID = telegramChatID.String
-			user.LastSeenAt = lastSeenAt.String
+
+			user := User{
+				ID:             authUser.ID,
+				OAuthProvider:  authUser.OAuthProvider,
+				OAuthID:        authUser.OAuthID,
+				Email:          authUser.Email,
+				Name:           authUser.Name,
+				AvatarURL:      authUser.AvatarURL,
+				TelegramChatID: authUser.TelegramChatID,
+				NotifyTelegram: authUser.NotifyTelegram,
+				NotifyEmail:    authUser.NotifyEmail,
+				IsAdmin:        authUser.IsAdmin,
+				IsActive:       authUser.IsActive,
+				CreatedAt:      authUser.CreatedAt,
+				LastSeenAt:     authUser.LastSeenAt,
+			}
 
 			ctx := context.WithValue(r.Context(), UserContextKey, &user)
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -164,19 +150,17 @@ func RequireAdmin(next http.Handler) http.Handler {
 }
 
 // CreateSession creates a new session in the DB, returns the signed cookie value.
-func CreateSession(db *sql.DB, userID int, sessionSecret string) (cookieValue string, expiresAt time.Time, err error) {
+func CreateSession(ctx context.Context, db *sql.DB, userID int, sessionSecret string) (cookieValue string, expiresAt time.Time, err error) {
+	repo := repository.NewAuthRepository(db)
+
 	token, err := generateUUID()
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("generating session token: %w", err)
 	}
 
 	expiresAt = time.Now().UTC().Add(30 * 24 * time.Hour)
-	_, err = db.Exec(
-		"INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)",
-		token, userID, expiresAt.Format("2006-01-02 15:04:05"),
-	)
-	if err != nil {
-		return "", time.Time{}, fmt.Errorf("inserting session: %w", err)
+	if err := repo.CreateSession(ctx, token, userID, expiresAt); err != nil {
+		return "", time.Time{}, fmt.Errorf("create session: %w", err)
 	}
 
 	sig := computeHMAC(token, sessionSecret)

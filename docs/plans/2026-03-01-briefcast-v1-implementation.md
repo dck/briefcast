@@ -6,7 +6,7 @@
 
 **Architecture:** Go Chi HTTP server + gocron worker sharing a SQLite (WAL) database. React Vite SPA served by static-web-server. Caddy reverse proxy in front. Episode pipeline: RSS poll → download → Groq Whisper transcription → Groq Llama summarization → Telegram/email notification.
 
-**Tech Stack:** Go 1.23 (Chi v5, goose, gocron, zerolog, goldmark, modernc.org/sqlite), React 19 (Vite, react-router, shadcn/ui, Tailwind CSS), Docker Compose, Caddy.
+**Tech Stack:** Go 1.26 (Chi v5, goose, gocron, zerolog, goldmark, modernc.org/sqlite), React 19 (Vite, react-router, shadcn/ui, Tailwind CSS), Docker Compose, Caddy.
 
 **Reference:** `prd.md` (full PRD), `docs/plans/2026-03-01-briefcast-v1-design.md` (design doc).
 
@@ -799,7 +799,7 @@ func main() {
 **Step 1:** Create `backend/Dockerfile` (multi-stage):
 
 ```dockerfile
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
