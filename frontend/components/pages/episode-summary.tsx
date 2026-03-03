@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { BriefcastLogo } from "@/components/briefcast-logo"
+import { BriefcastLogo, BriefcastWordmark } from "@/components/briefcast-logo"
 
 const topicSections = [
   {
@@ -70,9 +70,7 @@ export function EpisodeSummary() {
       <header className="flex items-center justify-between border-b border-border px-6 py-3">
         <div className="flex items-center gap-2.5">
           <BriefcastLogo size={20} className="text-primary" />
-          <span className="text-base font-semibold tracking-tight text-foreground">
-            Briefcast
-          </span>
+          <BriefcastWordmark className="text-base" />
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm">

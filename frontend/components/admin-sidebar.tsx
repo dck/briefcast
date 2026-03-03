@@ -7,7 +7,7 @@ import {
   LogOut,
 } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
-import { BriefcastLogo } from "@/components/briefcast-logo"
+import { BriefcastLogo, BriefcastWordmark } from "@/components/briefcast-logo"
 import { useAuth } from "@/src/auth"
 
 const adminNavItems = [
@@ -26,9 +26,7 @@ export function AdminSidebar() {
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 py-5">
         <BriefcastLogo size={22} className="text-primary" />
-        <span className="text-base font-semibold tracking-tight text-sidebar-foreground">
-          Briefcast
-        </span>
+        <BriefcastWordmark className="text-base text-sidebar-foreground" />
       </div>
 
       {/* Admin nav */}

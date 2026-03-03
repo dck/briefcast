@@ -1,46 +1,57 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap");
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.97 0.008 80);
-  --foreground: oklch(0.22 0.02 50);
-  --card: oklch(0.99 0.005 80);
-  --card-foreground: oklch(0.22 0.02 50);
-  --popover: oklch(0.99 0.005 80);
-  --popover-foreground: oklch(0.22 0.02 50);
-  --primary: oklch(0.48 0.1 170);
-  --primary-foreground: oklch(0.98 0.005 80);
-  --secondary: oklch(0.94 0.012 80);
-  --secondary-foreground: oklch(0.30 0.02 50);
-  --muted: oklch(0.93 0.01 80);
-  --muted-foreground: oklch(0.55 0.015 50);
-  --accent: oklch(0.92 0.02 170);
-  --accent-foreground: oklch(0.38 0.08 170);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.98 0.005 80);
-  --border: oklch(0.90 0.01 80);
-  --input: oklch(0.90 0.01 80);
-  --ring: oklch(0.48 0.1 170);
-  --chart-1: oklch(0.48 0.1 170);
-  --chart-2: oklch(0.60 0.12 85);
-  --chart-3: oklch(0.42 0.06 50);
-  --chart-4: oklch(0.70 0.1 140);
-  --chart-5: oklch(0.55 0.08 30);
-  --radius: 0.5rem;
-  --sidebar: oklch(0.96 0.01 80);
-  --sidebar-foreground: oklch(0.22 0.02 50);
-  --sidebar-primary: oklch(0.48 0.1 170);
-  --sidebar-primary-foreground: oklch(0.98 0.005 80);
-  --sidebar-accent: oklch(0.92 0.02 170);
-  --sidebar-accent-foreground: oklch(0.30 0.02 50);
-  --sidebar-border: oklch(0.90 0.01 80);
-  --sidebar-ring: oklch(0.48 0.1 170);
+  --brand-terra: #c1440e;
+  --brand-amber: #e07a30;
+  --brand-cream: #fdf8f3;
+  --brand-cream-dark: #f4ebe0;
+  --brand-parchment: #ead9c8;
+  --brand-sand: #d5bea8;
+  --brand-bark: #8b5e42;
+  --brand-ink: #1e1108;
+  --brand-muted: #957464;
+  --background: var(--brand-cream);
+  --foreground: var(--brand-ink);
+  --card: #fffcf9;
+  --card-foreground: var(--brand-ink);
+  --popover: #fffaf5;
+  --popover-foreground: var(--brand-ink);
+  --primary: var(--brand-terra);
+  --primary-foreground: #ffffff;
+  --secondary: var(--brand-cream-dark);
+  --secondary-foreground: #4a2e1a;
+  --muted: #f5ede4;
+  --muted-foreground: var(--brand-muted);
+  --accent: #f2e4d6;
+  --accent-foreground: #4a2e1a;
+  --destructive: #bf3e2b;
+  --destructive-foreground: #ffffff;
+  --border: rgba(139, 94, 66, 0.2);
+  --input: rgba(139, 94, 66, 0.2);
+  --ring: var(--brand-terra);
+  --chart-1: var(--brand-terra);
+  --chart-2: var(--brand-amber);
+  --chart-3: var(--brand-bark);
+  --chart-4: #b7622a;
+  --chart-5: #6e4a34;
+  --radius: 0.625rem;
+  --sidebar: #f9f1e8;
+  --sidebar-foreground: var(--brand-ink);
+  --sidebar-primary: var(--brand-terra);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1e3d4;
+  --sidebar-accent-foreground: #4a2e1a;
+  --sidebar-border: rgba(139, 94, 66, 0.24);
+  --sidebar-ring: var(--brand-terra);
 }
 
 @theme inline {
-  --font-sans: 'Inter', 'Inter Fallback', sans-serif;
+  --font-sans: 'Manrope', 'Inter', 'Inter Fallback', sans-serif;
+  --font-display: 'Inter', 'Manrope', sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -81,10 +92,19 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
   }
 }

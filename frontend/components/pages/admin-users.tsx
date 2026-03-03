@@ -132,8 +132,8 @@ export function AdminUsers() {
                     <span
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         user.isActive
-                          ? "bg-green-600 text-white"
-                          : "bg-gray-500 text-white"
+                          ? "border border-primary/30 bg-primary/10 text-primary"
+                          : "border border-border bg-muted text-muted-foreground"
                       }`}
                     >
                       {user.isActive ? "Active" : "Inactive"}

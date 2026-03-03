@@ -1,11 +1,11 @@
 type Status = "pending" | "processing" | "done" | "failed" | "skipped"
 
 const statusStyles: Record<Status, string> = {
-  pending: "bg-gray-500 text-white",
-  processing: "bg-blue-500 text-white animate-pulse",
-  done: "bg-green-600 text-white",
-  failed: "bg-red-600 text-white",
-  skipped: "bg-yellow-500 text-white",
+  pending: "border border-border bg-muted text-muted-foreground",
+  processing: "border border-primary/30 bg-primary/10 text-primary",
+  done: "border border-emerald-700/25 bg-emerald-700/10 text-emerald-800",
+  failed: "border border-destructive/35 bg-destructive/10 text-destructive",
+  skipped: "border border-amber-700/30 bg-amber-600/10 text-amber-800",
 }
 
 const statusLabels: Record<Status, string> = {
