@@ -42,3 +42,6 @@ audio/
 # Logs
 *.log
 prd.md
+
+# Local memory workspace
+memory/
