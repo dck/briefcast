@@ -76,10 +76,15 @@ jobs:
           scp docker-compose.yml Caddyfile "$VPS_USER@$VPS_HOST:/opt/briefcast/"
 
           ssh "$VPS_USER@$VPS_HOST" << 'EOF'
+            set -euo pipefail
             cd /opt/briefcast
             gunzip -c /tmp/images.tar.gz | docker load
-            docker compose up -d --no-deps frontend server worker
-            sleep 5
-            curl -sf http://localhost:8080/api/health || echo "Health check failed"
-            rm /tmp/images.tar.gz
+            docker tag briefcast-app:latest briefcast-server:latest
+            docker tag briefcast-app:latest briefcast-worker:latest
+            docker compose up -d --no-build
+            curl -fsS --retry 12 --retry-connrefused --retry-delay 5 http://localhost/api/health
+            for service in caddy frontend server worker; do
+              docker compose ps --services --status running | grep -qx "$service"
+            done
+            rm -f /tmp/images.tar.gz
           EOF
