@@ -60,9 +60,13 @@ jobs:
       - name: Deploy to VPS
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USER || secrets.VPS_USER }}
         run: |
+          : "${SSH_KEY:?Missing SSH_KEY secret}"
+          : "${VPS_HOST:?Missing VPS_HOST (set repo variable or secret)}"
+          : "${VPS_USER:?Missing VPS_USER (set repo variable or secret)}"
+
           mkdir -p ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
