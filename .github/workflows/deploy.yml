@@ -53,15 +53,17 @@ jobs:
 
       - name: Build Docker images
         run: |
-          docker build -t briefcast-app ./backend
+          docker build -t briefcast-server ./backend
+          docker tag briefcast-server briefcast-worker
           docker build -t briefcast-frontend ./frontend
-          docker save briefcast-app briefcast-frontend | gzip > images.tar.gz
+          docker save briefcast-server briefcast-worker briefcast-frontend | gzip > images.tar.gz
 
       - name: Deploy to VPS
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USER || secrets.VPS_USER }}
+          DOMAIN: ${{ vars.DOMAIN || '' }}
         run: |
           : "${SSH_KEY:?Missing SSH_KEY secret}"
           : "${VPS_HOST:?Missing VPS_HOST (set repo variable or secret)}"
@@ -75,14 +77,31 @@ jobs:
           scp images.tar.gz "$VPS_USER@$VPS_HOST:/tmp/"
           scp docker-compose.yml Caddyfile "$VPS_USER@$VPS_HOST:/opt/briefcast/"
 
-          ssh "$VPS_USER@$VPS_HOST" << 'EOF'
+          ssh "$VPS_USER@$VPS_HOST" "DOMAIN=${DOMAIN@Q} bash -se" << 'EOF'
             set -euo pipefail
             cd /opt/briefcast
+            if [[ -n "${DOMAIN:-}" ]]; then
+              if grep -q '^DOMAIN=' .env; then
+                sed -i "s|^DOMAIN=.*|DOMAIN=$DOMAIN|" .env
+              else
+                echo "DOMAIN=$DOMAIN" >> .env
+              fi
+            elif ! grep -q '^DOMAIN=' .env; then
+              echo "DOMAIN=:80" >> .env
+            fi
             gunzip -c /tmp/images.tar.gz | docker load
-            docker tag briefcast-app:latest briefcast-server:latest
-            docker tag briefcast-app:latest briefcast-worker:latest
+            docker image rm briefcast-app:latest >/dev/null 2>&1 || true
             docker compose up -d --no-build
-            curl -fsS --retry 12 --retry-connrefused --retry-delay 5 http://localhost/api/health
+            for attempt in {1..20}; do
+              if curl -fsS http://localhost:8080/api/health >/dev/null; then
+                break
+              fi
+              if [[ "$attempt" -eq 20 ]]; then
+                echo "Health check failed after 20 attempts"
+                exit 1
+              fi
+              sleep 3
+            done
             for service in caddy frontend server worker; do
               docker compose ps --services --status running | grep -qx "$service"
             done
